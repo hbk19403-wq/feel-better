@@ -1,7 +1,7 @@
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { JwtPayload } from '../types';
-import { dbGet, dbRun } from '../config/database';
+import { getDb } from '../config/database';
 
 const ACCESS_SECRET = process.env.JWT_SECRET || 'dev-access-secret-change-in-prod';
 const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'dev-refresh-secret-change-in-prod';
@@ -25,22 +25,21 @@ export function verifyRefreshToken(token: string): JwtPayload {
 export async function storeRefreshToken(userId: string, token: string): Promise<void> {
   const hash = crypto.createHash('sha256').update(token).digest('hex');
   const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-  await dbRun(
-    'INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES ($1,$2,$3)',
-    [userId, hash, expiresAt]
-  );
+  await getDb().from('refresh_tokens').insert({ user_id: userId, token_hash: hash, expires_at: expiresAt });
 }
 
 export async function validateRefreshToken(token: string): Promise<boolean> {
   const hash = crypto.createHash('sha256').update(token).digest('hex');
-  const row = await dbGet(
-    'SELECT id FROM refresh_tokens WHERE token_hash = $1 AND expires_at > NOW()',
-    [hash]
-  );
-  return !!row;
+  const { data } = await getDb()
+    .from('refresh_tokens')
+    .select('id')
+    .eq('token_hash', hash)
+    .gt('expires_at', new Date().toISOString())
+    .single();
+  return !!data;
 }
 
 export async function revokeRefreshToken(token: string): Promise<void> {
   const hash = crypto.createHash('sha256').update(token).digest('hex');
-  await dbRun('DELETE FROM refresh_tokens WHERE token_hash = $1', [hash]);
+  await getDb().from('refresh_tokens').delete().eq('token_hash', hash);
 }

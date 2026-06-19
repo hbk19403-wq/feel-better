@@ -1,55 +1,27 @@
-import { Pool, PoolClient, QueryResult } from 'pg';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 dotenv.config();
 
-// ── PostgreSQL pool (Supabase) ────────────────────────────────────────────────
-let _pool: Pool | null = null;
+const SUPABASE_URL = process.env.SUPABASE_URL || '';
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
-export function getPool(): Pool {
-  if (!_pool) {
-    const connectionString = process.env.DATABASE_URL;
-    if (!connectionString) throw new Error('DATABASE_URL env var is required');
-    _pool = new Pool({
-      connectionString,
-      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-      max: 10,
+if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
+  console.error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
+}
+
+// Server-side admin client — bypasses RLS
+let _client: SupabaseClient | null = null;
+
+export function getDb(): SupabaseClient {
+  if (!_client) {
+    _client = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
+      auth: { autoRefreshToken: false, persistSession: false },
     });
-    _pool.on('error', (err) => console.error('PG pool error:', err));
   }
-  return _pool;
+  return _client;
 }
 
-// ── Async query helpers ────────────────────────────────────────────────────────
-
-export async function dbAll<T = unknown>(sql: string, params: unknown[] = []): Promise<T[]> {
-  const res: QueryResult<T> = await getPool().query(sql, params);
-  return res.rows;
-}
-
-export async function dbGet<T = unknown>(sql: string, params: unknown[] = []): Promise<T | undefined> {
-  const res: QueryResult<T> = await getPool().query(sql, params);
-  return res.rows[0];
-}
-
-export async function dbRun(sql: string, params: unknown[] = []): Promise<void> {
-  await getPool().query(sql, params);
-}
-
-export async function dbExec(sql: string): Promise<void> {
-  await getPool().query(sql);
-}
-
-export async function withTransaction<T>(fn: (client: PoolClient) => Promise<T>): Promise<T> {
-  const client = await getPool().connect();
-  try {
-    await client.query('BEGIN');
-    const result = await fn(client);
-    await client.query('COMMIT');
-    return result;
-  } catch (err) {
-    await client.query('ROLLBACK');
-    throw err;
-  } finally {
-    client.release();
-  }
-}
+export const supabase = {
+  from: (table: string) => getDb().from(table),
+  rpc: (fn: string, params?: object) => getDb().rpc(fn, params),
+};

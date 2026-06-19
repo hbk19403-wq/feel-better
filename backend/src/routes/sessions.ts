@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
-import { dbGet, dbRun, dbAll } from '../config/database';
+import { getDb } from '../config/database';
 import { requireAuth } from '../middleware/auth';
 
 const router = Router();
@@ -17,7 +17,6 @@ const requestSchema = z.object({
   session_type: z.enum(['voice', 'text', 'scheduled']).default('voice'),
   listener_id: z.string().uuid().optional(),
   preferred_language: z.string().optional(),
-  scheduled_at: z.string().optional(),
   mood_before: z.number().int().min(1).max(5).optional(),
 });
 
@@ -26,35 +25,44 @@ router.post('/request', requireAuth, async (req: Request, res: Response) => {
     const parse = requestSchema.safeParse(req.body);
     if (!parse.success) return res.status(400).json({ error: parse.error.issues });
 
-    const { session_type, listener_id, scheduled_at, mood_before } = parse.data;
+    const { session_type, listener_id, mood_before } = parse.data;
     const category_id = parse.data.category_id || parse.data.category || 'venting_general';
-    const alias = generateAlias();
-    const status = listener_id ? 'active' : 'pending';
-    const startedAt = listener_id ? new Date().toISOString() : null;
+    const db = getDb();
 
-    const session = await dbGet<any>(
-      `INSERT INTO sessions (user_id, category_id, session_type, status, user_alias, listener_id, scheduled_at, mood_before, started_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
-      [req.user!.sub, category_id, session_type, status, alias, listener_id ?? null, scheduled_at ?? null, mood_before ?? null, startedAt]
-    );
+    const { data: session, error } = await db.from('sessions').insert({
+      user_id: req.user!.sub,
+      category_id,
+      session_type,
+      status: listener_id ? 'active' : 'pending',
+      user_alias: generateAlias(),
+      listener_id: listener_id || null,
+      mood_before: mood_before || null,
+      started_at: listener_id ? new Date().toISOString() : null,
+    }).select().single();
+
+    if (error || !session) return res.status(500).json({ error: error?.message });
 
     if (listener_id) {
-      await dbRun('UPDATE listeners SET active_session_count = active_session_count + 1 WHERE id = $1', [listener_id]);
+      await db.from('listeners').update({ active_session_count: db.from('listeners') })
+        .eq('id', listener_id);
+      // Simple increment
+      await db.rpc('increment_listener_sessions', { listener_id });
     }
 
     // Fetch with listener name
-    const full = await dbGet<any>(
-      `SELECT s.*, l.alias as listener_name, l.display_name, sc.name as category_name
-       FROM sessions s
-       LEFT JOIN listeners l ON s.listener_id = l.id
-       LEFT JOIN support_categories sc ON s.category_id = sc.id
-       WHERE s.id = $1`,
-      [session.id]
-    );
+    const { data: full } = await db.from('sessions')
+      .select('*, listeners(alias, display_name), support_categories(name)')
+      .eq('id', session.id)
+      .single();
 
-    res.status(201).json({ session: { ...full, listener_name: full?.display_name || full?.listener_name } });
+    const enriched = {
+      ...(full || session),
+      listener_name: (full as any)?.listeners?.display_name || (full as any)?.listeners?.alias,
+      category_name: (full as any)?.support_categories?.name,
+    };
+
+    res.status(201).json({ session: enriched });
   } catch (err: any) {
-    console.error('Session request error:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -62,16 +70,20 @@ router.post('/request', requireAuth, async (req: Request, res: Response) => {
 router.get('/history', requireAuth, async (req: Request, res: Response) => {
   try {
     const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
-    const offset = parseInt(req.query.offset as string) || 0;
-    const sessions = await dbAll(
-      `SELECT s.*, l.alias as listener_name, l.display_name, sc.name as category_name
-       FROM sessions s
-       LEFT JOIN listeners l ON s.listener_id = l.id
-       LEFT JOIN support_categories sc ON s.category_id = sc.id
-       WHERE s.user_id = $1 ORDER BY s.created_at DESC LIMIT $2 OFFSET $3`,
-      [req.user!.sub, limit, offset]
-    );
-    res.json({ sessions, limit, offset });
+    const { data: sessions } = await getDb()
+      .from('sessions')
+      .select('*, listeners(alias, display_name), support_categories(name)')
+      .eq('user_id', req.user!.sub)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    const enriched = (sessions || []).map((s: any) => ({
+      ...s,
+      listener_name: s.listeners?.display_name || s.listeners?.alias,
+      category_name: s.support_categories?.name,
+    }));
+
+    res.json({ sessions: enriched });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -79,16 +91,22 @@ router.get('/history', requireAuth, async (req: Request, res: Response) => {
 
 router.get('/:id', requireAuth, async (req: Request, res: Response) => {
   try {
-    const session = await dbGet<any>(
-      `SELECT s.*, l.alias as listener_name, l.display_name, l.specializations, l.average_rating, sc.name as category_name
-       FROM sessions s
-       LEFT JOIN listeners l ON s.listener_id = l.id
-       LEFT JOIN support_categories sc ON s.category_id = sc.id
-       WHERE s.id = $1 AND s.user_id = $2`,
-      [req.params.id, req.user!.sub]
-    );
+    const { data: session } = await getDb()
+      .from('sessions')
+      .select('*, listeners(alias, display_name, specializations, average_rating), support_categories(name)')
+      .eq('id', req.params.id)
+      .eq('user_id', req.user!.sub)
+      .single();
+
     if (!session) return res.status(404).json({ error: 'Session not found' });
-    res.json({ session: { ...session, listener_name: session.display_name || session.listener_name } });
+
+    res.json({
+      session: {
+        ...session,
+        listener_name: (session as any).listeners?.display_name || (session as any).listeners?.alias,
+        category_name: (session as any).support_categories?.name,
+      }
+    });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -96,24 +114,21 @@ router.get('/:id', requireAuth, async (req: Request, res: Response) => {
 
 router.post('/:id/end', requireAuth, async (req: Request, res: Response) => {
   try {
-    const session = await dbGet<any>('SELECT * FROM sessions WHERE id = $1 AND user_id = $2', [req.params.id, req.user!.sub]);
+    const db = getDb();
+    const { data: session } = await db.from('sessions').select('*').eq('id', req.params.id).eq('user_id', req.user!.sub).single();
     if (!session) return res.status(404).json({ error: 'Session not found' });
     if (session.status === 'completed') return res.status(400).json({ error: 'Session already ended' });
 
     const startedAt = session.started_at ? new Date(session.started_at) : new Date();
     const duration = Math.floor((Date.now() - startedAt.getTime()) / 1000);
 
-    await dbRun(
-      "UPDATE sessions SET status = 'completed', ended_at = NOW(), duration_seconds = $1 WHERE id = $2",
-      [duration, req.params.id]
-    );
+    await db.from('sessions').update({ status: 'completed', ended_at: new Date().toISOString(), duration_seconds: duration }).eq('id', req.params.id);
+
     if (session.listener_id) {
-      await dbRun(
-        'UPDATE listeners SET active_session_count = GREATEST(0, active_session_count - 1), total_sessions = total_sessions + 1 WHERE id = $1',
-        [session.listener_id]
-      );
+      await db.rpc('decrement_listener_sessions', { listener_id: session.listener_id });
     }
-    const updated = await dbGet<any>('SELECT * FROM sessions WHERE id = $1', [req.params.id]);
+
+    const { data: updated } = await db.from('sessions').select('*').eq('id', req.params.id).single();
     res.json({ session: updated });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -136,20 +151,15 @@ router.post('/:id/review', requireAuth, async (req: Request, res: Response) => {
     const rating = parse.data.listener_rating || parse.data.rating;
     const { mood_after } = parse.data;
     const comment = parse.data.session_comment || parse.data.comment;
+    const db = getDb();
 
-    const session = await dbGet<any>('SELECT * FROM sessions WHERE id = $1 AND user_id = $2', [req.params.id, req.user!.sub]);
+    const { data: session } = await db.from('sessions').select('listener_id').eq('id', req.params.id).eq('user_id', req.user!.sub).single();
     if (!session) return res.status(404).json({ error: 'Session not found' });
 
-    await dbRun('UPDATE sessions SET rating = $1, mood_after = $2, rating_comment = $3 WHERE id = $4',
-      [rating ?? null, mood_after ?? null, comment ?? null, req.params.id]);
+    await db.from('sessions').update({ rating: rating || null, mood_after: mood_after || null, rating_comment: comment || null }).eq('id', req.params.id);
 
     if (session.listener_id && rating) {
-      const l = await dbGet<any>('SELECT average_rating, rating_count FROM listeners WHERE id = $1', [session.listener_id]);
-      if (l) {
-        const newRating = (Number(l.average_rating) * l.rating_count + rating) / (l.rating_count + 1);
-        await dbRun('UPDATE listeners SET average_rating = $1, rating_count = rating_count + 1 WHERE id = $2',
-          [newRating.toFixed(2), session.listener_id]);
-      }
+      await db.rpc('update_listener_rating', { listener_id: session.listener_id, new_rating: rating });
     }
 
     res.json({ success: true });
