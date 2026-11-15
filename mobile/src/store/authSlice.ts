@@ -33,13 +33,31 @@ export const authSlice = createSlice({
   name: 'auth',
   initialState,
   reducers: {
-    setCredentials: (state, action: PayloadAction<{ user: User; access_token: string; refresh_token: string }>) => {
-      state.user = action.payload.user;
-      state.accessToken = action.payload.access_token;
+    // Accepts the backend's response shape ({ user, accessToken, refreshToken }),
+    // tolerating snake_case too for safety.
+    setCredentials: (state, action: PayloadAction<any>) => {
+      const p = action.payload || {};
+      const accessToken = p.accessToken ?? p.access_token ?? null;
+      const refreshToken = p.refreshToken ?? p.refresh_token ?? null;
+      state.user = p.user;
+      state.accessToken = accessToken;
       state.isAuthenticated = true;
-      state.onboardingComplete = !!action.payload.user.age_segment;
-      SecureStore.setItemAsync('refreshToken', action.payload.refresh_token);
-      SecureStore.setItemAsync('accessToken', action.payload.access_token);
+      state.onboardingComplete = !!p.user?.age_segment;
+      if (refreshToken) SecureStore.setItemAsync('refreshToken', refreshToken);
+      if (accessToken) SecureStore.setItemAsync('accessToken', accessToken);
+    },
+    // Restores just the tokens into state (app boot + after a silent refresh).
+    setTokens: (state, action: PayloadAction<{ accessToken: string; refreshToken?: string | null }>) => {
+      state.accessToken = action.payload.accessToken;
+      state.isAuthenticated = true;
+      SecureStore.setItemAsync('accessToken', action.payload.accessToken);
+      if (action.payload.refreshToken) SecureStore.setItemAsync('refreshToken', action.payload.refreshToken);
+    },
+    // Populates the user after a boot-time /users/me rehydrate.
+    hydrateUser: (state, action: PayloadAction<User>) => {
+      state.user = action.payload;
+      state.isAuthenticated = true;
+      state.onboardingComplete = !!action.payload.age_segment;
     },
     updateUser: (state, action: PayloadAction<Partial<User>>) => {
       if (state.user) state.user = { ...state.user, ...action.payload };
@@ -59,5 +77,5 @@ export const authSlice = createSlice({
   },
 });
 
-export const { setCredentials, updateUser, setOnboardingComplete, logout } = authSlice.actions;
+export const { setCredentials, setTokens, hydrateUser, updateUser, setOnboardingComplete, logout } = authSlice.actions;
 export default authSlice.reducer;

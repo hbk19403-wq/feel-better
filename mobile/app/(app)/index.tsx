@@ -90,6 +90,27 @@ export default function HomeScreen() {
           <Text style={{ color: '#FFF', fontSize: 22 }}>→</Text>
         </TouchableOpacity>
 
+        {/* AI Listeners card */}
+        <TouchableOpacity
+          onPress={() => router.push('/(app)/ai')}
+          style={{
+            backgroundColor: '#7C3AED', borderRadius: 16, padding: 20,
+            flexDirection: 'row', alignItems: 'center', gap: 14,
+          }}
+          accessibilityLabel="Chat with an AI listener"
+        >
+          <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' }}>
+            <Text style={{ fontSize: 26 }}>💬</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: '#FFF', fontSize: 18, fontWeight: '700' }}>Chat with an AI Listener</Text>
+            <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 14, marginTop: 2 }}>
+              Available 24/7 · first 15 min free
+            </Text>
+          </View>
+          <Text style={{ color: '#FFF', fontSize: 22 }}>→</Text>
+        </TouchableOpacity>
+
         {/* Mood Trend */}
         {trends && trends.length > 0 && (
           <View style={{ backgroundColor: Colors.surface, borderRadius: 16, padding: 20 }}>

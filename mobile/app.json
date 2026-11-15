@@ -2,6 +2,7 @@
   "expo": {
     "name": "1800-FeelBetter",
     "slug": "feelbetter",
+    "owner": "feelbetterinin",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -9,21 +10,51 @@
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#1A3C5E"
+      "backgroundColor": "#FFFFFF"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.feelbetter.app"
+      "bundleIdentifier": "com.feelbetter.app",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "1800-FeelBetter uses your microphone for live voice conversations with an AI listener."
+      },
+      "bitcode": false
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#1A3C5E"
+        "backgroundColor": "#FFFFFF"
       },
-      "package": "com.feelbetter.app"
+      "package": "com.feelbetter.app",
+      "permissions": [
+        "RECORD_AUDIO",
+        "MODIFY_AUDIO_SETTINGS",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.CAMERA",
+        "android.permission.INTERNET",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.WAKE_LOCK",
+        "android.permission.BLUETOOTH"
+      ]
     },
-    "plugins": ["expo-router", "expo-secure-store"],
-    "scheme": "feelbetter"
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "@config-plugins/react-native-webrtc"
+    ],
+    "scheme": "feelbetter",
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "4caed4a3-8d3c-4ceb-8787-2b29d7640f17"
+      }
+    }
   }
 }

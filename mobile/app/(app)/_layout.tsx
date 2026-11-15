@@ -36,6 +36,14 @@ export default function AppLayout() {
         options={{ tabBarIcon: ({ focused }) => <TabIcon emoji="🤝" label="Connect" focused={focused} /> }}
       />
       <Tabs.Screen
+        name="community"
+        options={{ tabBarIcon: ({ focused }) => <TabIcon emoji="🫂" label="Community" focused={focused} /> }}
+      />
+      <Tabs.Screen
+        name="vent-line"
+        options={{ tabBarIcon: ({ focused }) => <TabIcon emoji="📞" label="Vent" focused={focused} /> }}
+      />
+      <Tabs.Screen
         name="resources"
         options={{ tabBarIcon: ({ focused }) => <TabIcon emoji="📚" label="Library" focused={focused} /> }}
       />
@@ -44,6 +52,10 @@ export default function AppLayout() {
         options={{ tabBarIcon: ({ focused }) => <TabIcon emoji="👤" label="Me" focused={focused} /> }}
       />
       <Tabs.Screen name="session" options={{ href: null }} />
+      <Tabs.Screen name="ai" options={{ href: null }} />
+      <Tabs.Screen name="ai-chat" options={{ href: null }} />
+      <Tabs.Screen name="ai-voice" options={{ href: null }} />
+      <Tabs.Screen name="plans" options={{ href: null }} />
     </Tabs>
   );
 }

@@ -3,7 +3,8 @@ import { View, Text, TouchableOpacity, Alert } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors } from '../../../src/constants/colors';
-import { useGetSessionQuery, useEndSessionMutation } from '../../../src/store/api/apiSlice';
+import UpiPayModal from '../../../src/components/UpiPayModal';
+import { useGetSessionQuery, useEndSessionMutation, useSettleSessionMutation, useConfirmSettleMutation } from '../../../src/store/api/apiSlice';
 
 function formatTime(seconds: number) {
   const m = Math.floor(seconds / 60).toString().padStart(2, '0');
@@ -17,6 +18,12 @@ export default function InCallScreen() {
   const [muted, setMuted] = useState(false);
   const [showCrisis, setShowCrisis] = useState(false);
   const [endSession] = useEndSessionMutation();
+  const [settleSession] = useSettleSessionMutation();
+  const [confirmSettle] = useConfirmSettleMutation();
+  const [settleDue, setSettleDue] = useState(0);
+  const [settleOrder, setSettleOrder] = useState<any | null>(null);
+  const [settleUtr, setSettleUtr] = useState('');
+  const [settleBusy, setSettleBusy] = useState(false);
   const { data: session } = useGetSessionQuery(id!);
   const intervalRef = useRef<ReturnType<typeof setInterval>>();
 
@@ -34,15 +41,37 @@ export default function InCallScreen() {
     }
   }, [elapsed]);
 
+  const goReview = () => router.replace({ pathname: '/(app)/session/review', params: { id } });
+
   const handleEnd = async () => {
     clearInterval(intervalRef.current);
     try {
-      await endSession(id!).unwrap();
-      router.replace({ pathname: '/(app)/session/review', params: { id } });
+      const res: any = await endSession(id!).unwrap();
+      const due = Math.round(Number(res?.billing?.amount_inr) || 0);
+      if (due > 0) { setSettleDue(due); return; } // show settle before review
+      goReview();
     } catch {
-      router.replace({ pathname: '/(app)/session/review', params: { id } });
+      goReview();
     }
   };
+
+  async function startSettle() {
+    setSettleBusy(true);
+    try {
+      const d: any = await settleSession(id!).unwrap();
+      if (d.nothing_due) { goReview(); return; }
+      setSettleOrder(d); setSettleUtr('');
+    } catch {} finally { setSettleBusy(false); }
+  }
+
+  async function doConfirmSettle() {
+    if (!settleOrder) return;
+    setSettleBusy(true);
+    try {
+      await confirmSettle({ id: id!, txn_ref: settleOrder.txn_ref, upi_txn_id: settleUtr.trim() }).unwrap();
+      goReview();
+    } catch {} finally { setSettleBusy(false); }
+  }
 
   const confirmEnd = () => {
     Alert.alert('End session?', 'Are you sure you want to end this session?', [
@@ -168,6 +197,27 @@ export default function InCallScreen() {
           </Text>
         </View>
       </View>
+
+      {/* Settle prompt (before the UPI sheet) */}
+      {settleDue > 0 && !settleOrder && (
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.75)', alignItems: 'center', justifyContent: 'center', padding: 28 }}>
+          <View style={{ backgroundColor: Colors.surface, borderRadius: 20, padding: 26, width: '100%', alignItems: 'center' }}>
+            <Text style={{ fontSize: 40 }}>🧾</Text>
+            <Text style={{ fontSize: 20, fontWeight: '800', marginTop: 6 }}>Settle your session</Text>
+            <Text style={{ fontSize: 14, color: Colors.textSecondary, marginTop: 4, textAlign: 'center' }}>Your live session was ₹1/min.</Text>
+            <Text style={{ fontSize: 40, fontWeight: '800', marginVertical: 10 }}>₹{settleDue}</Text>
+            <TouchableOpacity onPress={startSettle} disabled={settleBusy} style={{ backgroundColor: Colors.primaryMid, borderRadius: 22, paddingVertical: 13, alignItems: 'center', width: '100%', opacity: settleBusy ? 0.6 : 1 }}>
+              <Text style={{ color: '#fff', fontWeight: '700' }}>{settleBusy ? '…' : `Pay ₹${settleDue} via UPI`}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={goReview} style={{ paddingVertical: 12 }}>
+              <Text style={{ color: Colors.textSecondary }}>Pay later</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      <UpiPayModal order={settleOrder} subtitle="Live listener session" utr={settleUtr}
+        onChangeUtr={setSettleUtr} onConfirm={doConfirmSettle} onCancel={goReview} busy={settleBusy} />
     </LinearGradient>
   );
 }

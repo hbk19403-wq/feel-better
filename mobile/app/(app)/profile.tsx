@@ -72,6 +72,7 @@ export default function ProfileScreen() {
               )}
             </View>
             <TouchableOpacity
+              onPress={() => router.push('/(app)/plans')}
               style={{ marginTop: 14, backgroundColor: Colors.primaryMid, borderRadius: 12, paddingVertical: 12, alignItems: 'center' }}
             >
               <Text style={{ color: '#FFF', fontWeight: '700' }}>Upgrade Plan</Text>

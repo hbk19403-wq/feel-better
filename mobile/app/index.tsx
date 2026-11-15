@@ -5,7 +5,7 @@ import * as SecureStore from 'expo-secure-store';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors } from '../src/constants/colors';
 import { useAppDispatch } from '../src/store';
-import { setCredentials } from '../src/store/authSlice';
+import { setTokens, hydrateUser } from '../src/store/authSlice';
 import { api } from '../src/store/api/apiSlice';
 
 export default function SplashScreen() {
@@ -16,10 +16,18 @@ export default function SplashScreen() {
       await new Promise((r) => setTimeout(r, 1800));
       try {
         const token = await SecureStore.getItemAsync('accessToken');
-        if (token) {
-          const refreshToken = await SecureStore.getItemAsync('refreshToken');
+        const refreshToken = await SecureStore.getItemAsync('refreshToken');
+        if (!token) { router.replace('/(auth)'); return; }
+
+        // Put the stored token back into state, then fetch the user. If the
+        // access token has expired, the reauth wrapper silently refreshes it;
+        // only if that fails do we fall back to the auth flow.
+        dispatch(setTokens({ accessToken: token, refreshToken }));
+        try {
+          const me = await dispatch(api.endpoints.getMe.initiate(undefined, { forceRefetch: true })).unwrap();
+          dispatch(hydrateUser(me));
           router.replace('/(app)');
-        } else {
+        } catch {
           router.replace('/(auth)');
         }
       } catch {
