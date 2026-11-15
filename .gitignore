@@ -9,3 +9,4 @@ dist/
 feelbetter.db
 .DS_Store
 .vercel/
+.claude/
