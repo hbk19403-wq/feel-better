@@ -1,19 +1,23 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
-import { dbGet, dbRun } from '../config/database';
+import { getDb } from '../config/database';
 import { requireAuth } from '../middleware/auth';
 
 const router = Router();
 
 function safeUser(u: any) {
   const { password_hash, ...rest } = u;
-  return { ...rest, anonymous_mode: !!rest.anonymous_mode, is_minor: !!rest.is_minor };
+  return rest;
 }
 
-router.get('/me', requireAuth, (req: Request, res: Response) => {
-  const user = dbGet<any>('SELECT * FROM users WHERE id = ?', [req.user!.sub]);
-  if (!user) return res.status(404).json({ error: 'User not found' });
-  res.json(safeUser(user));
+router.get('/me', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const { data, error } = await getDb().from('users').select('*').eq('id', req.user!.sub).single();
+    if (error || !data) return res.status(404).json({ error: 'User not found' });
+    res.json(safeUser(data));
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 const updateSchema = z.object({
@@ -26,23 +30,24 @@ const updateSchema = z.object({
   consent_marketing: z.boolean().optional(),
 });
 
-router.patch('/me', requireAuth, (req: Request, res: Response) => {
-  const parse = updateSchema.safeParse(req.body);
-  if (!parse.success) return res.status(400).json({ error: parse.error.issues });
+router.patch('/me', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const parse = updateSchema.safeParse(req.body);
+    if (!parse.success) return res.status(400).json({ error: parse.error.issues });
+    const fields = parse.data;
+    if (Object.keys(fields).length === 0) return res.status(400).json({ error: 'No fields to update' });
 
-  const fields = parse.data;
-  const keys = Object.keys(fields) as (keyof typeof fields)[];
-  if (keys.length === 0) return res.status(400).json({ error: 'No fields to update' });
-
-  const setClauses = keys.map((k) => `${k} = ?`).join(', ');
-  const values = keys.map((k) => {
-    const v = fields[k];
-    return typeof v === 'boolean' ? (v ? 1 : 0) : v;
-  });
-
-  dbRun(`UPDATE users SET ${setClauses}, updated_at = datetime('now') WHERE id = ?`, [...values, req.user!.sub]);
-  const user = dbGet<any>('SELECT * FROM users WHERE id = ?', [req.user!.sub]);
-  res.json(safeUser(user!));
+    const { data, error } = await getDb()
+      .from('users')
+      .update({ ...fields, updated_at: new Date().toISOString() })
+      .eq('id', req.user!.sub)
+      .select()
+      .single();
+    if (error) return res.status(500).json({ error: error.message });
+    res.json(safeUser(data));
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 export default router;

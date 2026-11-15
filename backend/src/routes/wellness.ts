@@ -11,7 +11,7 @@ const checkinSchema = z.object({
   note: z.string().max(500).optional(),
 });
 
-router.post('/checkins', requireAuth, async (req: Request, res: Response) => {
+async function createCheckin(req: Request, res: Response) {
   try {
     const parse = checkinSchema.safeParse(req.body);
     if (!parse.success) return res.status(400).json({ error: parse.error.issues });
@@ -25,12 +25,10 @@ router.post('/checkins', requireAuth, async (req: Request, res: Response) => {
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
-});
+}
 
-router.post('/checkin', requireAuth, async (req: Request, res: Response) => {
-  req.url = '/checkins';
-  router.handle(req, res, () => {});
-});
+router.post('/checkins', requireAuth, createCheckin);
+router.post('/checkin', requireAuth, createCheckin);
 
 router.get('/checkins', requireAuth, async (req: Request, res: Response) => {
   try {
