@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth, API } from '../context/AuthContext';
+import { useAuth } from '../context/AuthContext';
 
 const CATEGORIES = [
   { id: 'relationship_dating', label: 'Relationship & Dating', emoji: '💕' },
@@ -30,7 +30,7 @@ interface Listener {
 }
 
 export default function Match() {
-  const { token } = useAuth();
+  const { authFetch } = useAuth();
   const nav = useNavigate();
   const [step, setStep] = useState<'category' | 'listeners' | 'loading'>('category');
   const [category, setCategory] = useState('');
@@ -38,19 +38,25 @@ export default function Match() {
   const [connecting, setConnecting] = useState('');
   const [error, setError] = useState('');
 
-  const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+  const jsonHeaders = { 'Content-Type': 'application/json' };
+
+  async function safeJson(res: Response): Promise<any> {
+    const text = await res.text();
+    try { return text ? JSON.parse(text) : {}; } catch { return {}; }
+  }
 
   async function findListeners(cat: string) {
     setCategory(cat);
     setStep('loading');
     setError('');
     try {
-      const res = await fetch(`${API}/listeners/match?category=${cat}`, { headers });
-      const data = await res.json();
-      setListeners(data.listeners || []);
+      const res = await authFetch(`/listeners/match?category=${cat}`, { headers: jsonHeaders });
+      const data = await safeJson(res);
+      if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+      setListeners(Array.isArray(data.listeners) ? data.listeners : []);
       setStep('listeners');
-    } catch {
-      setError('Could not load listeners. Please try again.');
+    } catch (err: any) {
+      setError(err?.message ? `Could not load listeners: ${err.message}` : 'Could not load listeners. Please check your connection and try again.');
       setStep('category');
     }
   }
@@ -58,12 +64,12 @@ export default function Match() {
   async function connect(listenerId: string) {
     setConnecting(listenerId);
     try {
-      const res = await fetch(`${API}/sessions/request`, {
+      const res = await authFetch(`/sessions/request`, {
         method: 'POST',
-        headers,
+        headers: jsonHeaders,
         body: JSON.stringify({ category, listener_id: listenerId, preferred_language: 'English' }),
       });
-      const data = await res.json();
+      const data = await safeJson(res);
       if (!res.ok) throw new Error(data.error || 'Failed to start session');
       nav(`/session/${data.session.id}`);
     } catch (err: any) {
@@ -107,9 +113,12 @@ export default function Match() {
             <button className="btn btn-primary" onClick={() => findListeners(category)}>Try again</button>
           </div>
         ) : (
-          <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))' }}>
+          <div className="stagger" style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))' }}>
             {listeners.map((l, i) => (
-              <div key={l.id} className="card" style={{ padding: 24, position: 'relative', border: i === 0 ? '2px solid var(--accent)' : undefined }}>
+              <div key={l.id} className="card" style={{ padding: 24, position: 'relative', borderRadius: 18, border: i === 0 ? '2px solid var(--accent)' : undefined, transition: 'transform .18s, box-shadow .18s' }}
+                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = 'var(--shadow-lg)'; }}
+                onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'var(--shadow)'; }}
+              >
                 {i === 0 && (
                   <div style={{ position: 'absolute', top: -1, right: 16, background: 'var(--accent)', color: 'white', fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: '0 0 8px 8px', letterSpacing: 0.5 }}>
                     BEST MATCH
@@ -168,46 +177,44 @@ export default function Match() {
     );
   }
 
+  const CAT_GRADS = [
+    'linear-gradient(135deg,#6366F1,#4F46E5)', 'linear-gradient(135deg,#EC4899,#DB2777)',
+    'linear-gradient(135deg,#17A589,#0e7a5f)', 'linear-gradient(135deg,#F59E0B,#D97706)',
+    'linear-gradient(135deg,#8B5CF6,#7C3AED)', 'linear-gradient(135deg,#2E75B6,#1A3C5E)',
+  ];
+
   return (
     <div className="fade-in">
-      <div style={{ marginBottom: 32 }}>
-        <h1 style={{ fontSize: 26, fontWeight: 700, marginBottom: 8 }}>What's on your mind?</h1>
-        <p style={{ fontSize: 16, color: 'var(--text-secondary)' }}>Choose a topic and we'll match you with the right listener.</p>
+      {/* Hero */}
+      <div className="anim-gradient" style={{ background: 'linear-gradient(120deg,#1A3C5E,#2E75B6,#17A589)', borderRadius: 24, padding: '36px 40px', marginBottom: 28, color: 'white', position: 'relative', overflow: 'hidden' }}>
+        <div style={{ position: 'absolute', top: -28, right: -8, fontSize: 150, opacity: 0.13, animation: 'float 6s ease-in-out infinite' }}>💬</div>
+        <div style={{ position: 'relative' }}>
+          <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', opacity: 0.85 }}>Connect</span>
+          <h1 style={{ fontSize: 32, fontWeight: 800, margin: '10px 0 8px' }}>What's on your mind?</h1>
+          <p style={{ fontSize: 16, opacity: 0.92, maxWidth: 520, lineHeight: 1.5 }}>Choose a topic and we'll match you with the right listener.</p>
+        </div>
       </div>
 
-      {error && <div style={{ background: 'var(--danger-light)', padding: 16, borderRadius: 8, color: 'var(--danger)', marginBottom: 16, fontSize: 14 }}>{error}</div>}
+      {error && <div style={{ background: 'var(--danger-light)', padding: 16, borderRadius: 12, color: 'var(--danger)', marginBottom: 16, fontSize: 14 }}>{error}</div>}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 14 }}>
-        {CATEGORIES.map(cat => (
+      <div className="stagger" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 16 }}>
+        {CATEGORIES.map((cat, i) => (
           <button
             key={cat.id}
             onClick={() => findListeners(cat.id)}
             style={{
-              background: 'white',
-              border: '1.5px solid var(--border)',
-              borderRadius: 12,
-              padding: '20px 16px',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: 10,
-              cursor: 'pointer',
-              transition: 'all 0.15s',
-              textAlign: 'center',
+              background: 'white', border: 'none', borderRadius: 18, padding: 0, overflow: 'hidden',
+              display: 'flex', flexDirection: 'column', cursor: 'pointer',
+              boxShadow: 'var(--shadow)', transition: 'transform .18s, box-shadow .18s', textAlign: 'center',
             }}
-            onMouseEnter={e => {
-              e.currentTarget.style.borderColor = 'var(--primary-mid)';
-              e.currentTarget.style.boxShadow = 'var(--shadow-md)';
-              e.currentTarget.style.transform = 'translateY(-2px)';
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.borderColor = 'var(--border)';
-              e.currentTarget.style.boxShadow = 'none';
-              e.currentTarget.style.transform = 'none';
-            }}
+            onMouseEnter={e => { e.currentTarget.style.boxShadow = 'var(--shadow-lg)'; e.currentTarget.style.transform = 'translateY(-4px)'; }}
+            onMouseLeave={e => { e.currentTarget.style.boxShadow = 'var(--shadow)'; e.currentTarget.style.transform = 'none'; }}
           >
-            <span style={{ fontSize: 32 }}>{cat.emoji}</span>
-            <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)', lineHeight: 1.3 }}>{cat.label}</span>
+            <div style={{ background: CAT_GRADS[i % CAT_GRADS.length], padding: '22px 0', position: 'relative', overflow: 'hidden' }}>
+              <div style={{ position: 'absolute', bottom: -12, right: -6, fontSize: 64, opacity: 0.22 }}>{cat.emoji}</div>
+              <span style={{ fontSize: 36, position: 'relative' }}>{cat.emoji}</span>
+            </div>
+            <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.3, padding: '16px 12px' }}>{cat.label}</span>
           </button>
         ))}
       </div>

@@ -115,6 +115,12 @@ input, textarea, select { font-family: inherit; outline: none; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.5; } }
 @keyframes ping { 0% { transform: scale(1); opacity: 1; } 75%,100% { transform: scale(2); opacity: 0; } }
+@keyframes float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+@keyframes gradientShift { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+@keyframes shimmerMove { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+.anim-gradient { background-size: 200% 200%; animation: gradientShift 8s ease infinite; }
+.stagger > * { opacity: 0; animation: fadeUp 0.5s ease forwards; }
+.stagger > *:nth-child(1){animation-delay:.04s}.stagger > *:nth-child(2){animation-delay:.08s}.stagger > *:nth-child(3){animation-delay:.12s}.stagger > *:nth-child(4){animation-delay:.16s}.stagger > *:nth-child(5){animation-delay:.2s}.stagger > *:nth-child(6){animation-delay:.24s}.stagger > *:nth-child(7){animation-delay:.28s}.stagger > *:nth-child(8){animation-delay:.32s}.stagger > *:nth-child(9){animation-delay:.36s}
 
 .fade-in { animation: fadeIn 0.25s ease; }
 .fade-up { animation: fadeUp 0.35s ease; }
@@ -136,6 +142,53 @@ input, textarea, select { font-family: inherit; outline: none; }
 .page-container { max-width: 1100px; margin: 0 auto; padding: 0 24px; width: 100%; }
 .section-title { font-size: 20px; font-weight: 700; color: var(--text-primary); margin-bottom: 4px; }
 .section-subtitle { font-size: 14px; color: var(--text-secondary); margin-bottom: 24px; }
+
+/* ---- Interaction polish (additive) ---- */
+html { scroll-behavior: smooth; }
+
+/* Tactile press feedback on all buttons. */
+.btn:active:not(:disabled) { transform: translateY(0) scale(0.97); transition: transform .06s ease; }
+
+/* Accessible keyboard focus rings (mouse users unaffected). */
+.btn:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 3px solid rgba(46,117,182,0.45);
+  outline-offset: 2px;
+}
+
+/* Reusable hover-lift for cards/tiles — add className="lift". */
+.lift { transition: transform .18s ease, box-shadow .18s ease; will-change: transform; }
+.lift:hover { transform: translateY(-4px); box-shadow: var(--shadow-lg); }
+
+/* Press-scale for tappable tiles. */
+.tap { transition: transform .12s ease; }
+.tap:active { transform: scale(0.97); }
+
+/* Shimmer skeleton for loading states — add className="skeleton". */
+.skeleton {
+  background: linear-gradient(90deg, var(--border) 25%, #eef2f7 37%, var(--border) 63%);
+  background-size: 400% 100%;
+  animation: shimmerMove 1.4s ease infinite;
+  border-radius: var(--radius-sm);
+}
+
+/* Gentle attention halo for primary CTAs — add className="cta-glow".
+   (Landing has its own .pulse-cta; keep this name distinct to avoid clashes.) */
+@keyframes ctaGlow { 0%,100% { box-shadow: 0 0 0 0 rgba(46,117,182,0.35); } 50% { box-shadow: 0 0 0 10px rgba(46,117,182,0); } }
+.cta-glow { animation: ctaGlow 2.4s ease-in-out infinite; }
+
+/* Respect users who prefer reduced motion. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
 
 /* Online dot */
 .dot-online { width: 10px; height: 10px; border-radius: 50%; background: #22C55E; position: relative; flex-shrink: 0; }

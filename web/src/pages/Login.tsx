@@ -1,6 +1,7 @@
-import { useState, FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import SocialAuth from '../components/SocialAuth';
 
 export default function Login() {
   const { login } = useAuth();
@@ -16,7 +17,7 @@ export default function Login() {
     setLoading(true);
     try {
       await login(email, password);
-      nav('/');
+      nav('/home');
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -50,6 +51,12 @@ export default function Login() {
             {loading ? <span className="spinner" /> : 'Sign in'}
           </button>
         </form>
+
+        <SocialAuth onSuccess={() => nav('/home')} />
+
+        <p style={{ textAlign: 'center', marginTop: 16, fontSize: 14 }}>
+          <Link to="/forgot-password" style={{ color: 'var(--primary-mid)', fontWeight: 600 }}>Forgot your password?</Link>
+        </p>
 
         <p style={{ textAlign: 'center', marginTop: 24, color: 'var(--text-secondary)', fontSize: 14 }}>
           New here?{' '}

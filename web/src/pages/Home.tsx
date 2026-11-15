@@ -6,7 +6,7 @@ const MOODS = ['😢', '😟', '😐', '🙂', '😊'];
 const MOOD_LABELS = ['Very low', 'Low', 'Neutral', 'Good', 'Great'];
 
 interface Checkin { mood_score: number; created_at: string; }
-interface Resource { id: string; title: string; category: string; content: string; resource_type: string; }
+interface Resource { id: string; title: string; category_id?: string; category?: string; content?: string; type?: string; resource_type?: string; }
 interface Workshop { id: string; title: string; description: string; facilitator: string; scheduled_at: string; duration_minutes: number; max_participants: number; }
 
 export default function Home() {
@@ -47,16 +47,42 @@ export default function Home() {
   return (
     <div>
       {/* Hero */}
-      <div style={{ background: 'linear-gradient(135deg, var(--primary-dark) 0%, var(--primary-mid) 100%)', borderRadius: 16, padding: '36px 40px', marginBottom: 32, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 24, flexWrap: 'wrap' }}>
-        <div>
-          <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 8 }}>{greeting}, {user?.name} 👋</h1>
-          <p style={{ opacity: 0.85, fontSize: 16, maxWidth: 480 }}>
-            You deserve to feel heard. Our trained listeners are here for you, anytime.
+      <div className="anim-gradient" style={{ background: 'linear-gradient(120deg,#1A3C5E,#2E75B6,#17A589)', borderRadius: 24, padding: '40px 40px', marginBottom: 28, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 24, flexWrap: 'wrap', position: 'relative', overflow: 'hidden' }}>
+        <div style={{ position: 'absolute', top: -30, right: 120, fontSize: 150, opacity: 0.12, animation: 'float 6s ease-in-out infinite' }}>🌤️</div>
+        <div style={{ position: 'relative' }}>
+          <h1 style={{ fontSize: 30, fontWeight: 800, marginBottom: 8 }}>{greeting}, {user?.name} 👋</h1>
+          <p style={{ opacity: 0.9, fontSize: 16, maxWidth: 480, lineHeight: 1.5 }}>
+            Your feelings need somewhere to go. Our listeners are here for you, anytime.
           </p>
         </div>
-        <button className="btn btn-accent btn-lg" onClick={() => nav('/match')} style={{ flexShrink: 0 }}>
-          💬 Talk to someone now
+        <button onClick={() => nav('/vent-line')} style={{ flexShrink: 0, cursor: 'pointer', border: 'none', borderRadius: 999, padding: '14px 26px', fontWeight: 800, fontSize: 15, background: 'white', color: '#1A3C5E', position: 'relative' }}>
+          📞 Open The Vent Line
         </button>
+      </div>
+
+      {/* CTA row */}
+      <div className="stagger" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: 18, marginBottom: 32 }}>
+        {[
+          { to: '/vent-line', emoji: '📞', title: 'The Vent Line', desc: 'Just need to let it out? Be heard instantly.', grad: 'linear-gradient(135deg,#2E75B6,#1A3C5E)', tags: ['Instant', 'Anonymous'] },
+          { to: '/community', emoji: '🫂', title: 'Community', desc: 'Anonymous groups — trust, marriage, anxiety & more.', grad: 'linear-gradient(135deg,#8B5CF6,#6D28D9)', tags: ['Peer support', 'No judgment'] },
+          { to: '/chat', emoji: '💬', title: 'Talk to someone', desc: 'A caring listener is here for you, 24/7.', grad: 'linear-gradient(135deg,#EC4899,#DB2777)', tags: ['Free to start', 'Confidential'] },
+          { to: '/therapists', emoji: '🏥', title: 'Find a Therapist', desc: 'Licensed therapists, psychologists & healers.', grad: 'linear-gradient(135deg,#17A589,#0e7a5f)', tags: ['Verified', 'All specialties'] },
+        ].map(c => (
+          <div key={c.to} style={{ borderRadius: 20, padding: 22, cursor: 'pointer', background: c.grad, color: 'white', position: 'relative', overflow: 'hidden', boxShadow: 'var(--shadow-md)', transition: 'transform .18s, box-shadow .18s' }}
+            onClick={() => nav(c.to)}
+            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px) scale(1.01)'; e.currentTarget.style.boxShadow = 'var(--shadow-lg)'; }}
+            onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'var(--shadow-md)'; }}>
+            <div style={{ position: 'absolute', bottom: -16, right: -10, fontSize: 84, opacity: 0.18 }}>{c.emoji}</div>
+            <div style={{ position: 'relative' }}>
+              <div style={{ fontSize: 30, marginBottom: 8 }}>{c.emoji}</div>
+              <h3 style={{ fontSize: 17, fontWeight: 800, marginBottom: 4 }}>{c.title}</h3>
+              <p style={{ fontSize: 13, opacity: 0.92, lineHeight: 1.5, marginBottom: 12 }}>{c.desc}</p>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {c.tags.map(t => <span key={t} style={{ fontSize: 10.5, fontWeight: 700, padding: '3px 9px', borderRadius: 999, background: 'rgba(255,255,255,0.22)' }}>{t}</span>)}
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, marginBottom: 24 }}>
@@ -142,13 +168,13 @@ export default function Home() {
                 onMouseEnter={e => (e.currentTarget.style.boxShadow = 'var(--shadow-md)')}
                 onMouseLeave={e => (e.currentTarget.style.boxShadow = 'var(--shadow)')}
               >
-                <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>
-                  {r.resource_type === 'article' ? '📄' : r.resource_type === 'video' ? '🎥' : '🎧'}
+                <div style={{ width: 44, height: 44, borderRadius: 12, background: 'linear-gradient(135deg,#6366F1,#4F46E5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 19, flexShrink: 0 }}>
+                  {(() => { const t = r.type || r.resource_type; return t === 'article' ? '📄' : t === 'video' ? '🎥' : '🎧'; })()}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <p style={{ fontWeight: 600, fontSize: 15, marginBottom: 4 }}>{r.title}</p>
                   <p style={{ fontSize: 13, color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.content?.slice(0, 100)}…</p>
-                  <span className="badge badge-blue" style={{ marginTop: 8 }}>{r.category.replace(/_/g, ' ')}</span>
+                  {(r.category_id || r.category) && <span className="badge badge-blue" style={{ marginTop: 8 }}>{(r.category_id || r.category || '').replace(/_/g, ' ')}</span>}
                 </div>
               </div>
             ))}
@@ -180,9 +206,9 @@ export default function Home() {
           <div style={{ marginTop: 16, background: 'var(--danger-light)', border: '1px solid #FADBD8', borderRadius: 12, padding: 16 }}>
             <p style={{ fontWeight: 600, fontSize: 14, color: '#922B21', marginBottom: 8 }}>🆘 Crisis Support</p>
             <p style={{ fontSize: 13, color: '#922B21', lineHeight: 1.6 }}>
-              <strong>988</strong> — Suicide & Crisis Lifeline<br />
-              <strong>741741</strong> — Crisis Text Line<br />
-              <strong>911</strong> — Emergency services
+              <strong>14416</strong> — Tele-MANAS · Govt of India<br />
+              <strong>1800-599-0019</strong> — KIRAN Helpline<br />
+              <strong>112</strong> — Emergency services
             </p>
           </div>
         </div>

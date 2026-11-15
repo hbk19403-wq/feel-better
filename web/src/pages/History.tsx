@@ -4,7 +4,9 @@ import { useAuth, API } from '../context/AuthContext';
 
 interface Session {
   id: string;
-  category: string;
+  category?: string;
+  category_id?: string;
+  category_name?: string;
   status: string;
   listener_name?: string;
   user_alias: string;
@@ -74,7 +76,7 @@ export default function History() {
                   </span>
                 </div>
                 <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 4 }}>
-                  {s.category.replace(/_/g, ' ')} · As <em>{s.user_alias}</em>
+                  {(s.category_name || s.category_id || s.category || 'Conversation').replace(/_/g, ' ')} · As <em>{s.user_alias}</em>
                 </p>
                 <p style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>
                   {s.started_at ? new Date(s.started_at).toLocaleDateString('en', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Pending'}

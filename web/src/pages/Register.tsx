@@ -1,6 +1,7 @@
-import { useState, FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import SocialAuth from '../components/SocialAuth';
 
 const LANGUAGES = ['English', 'Spanish', 'Hindi', 'Mandarin', 'French', 'Arabic', 'Portuguese'];
 
@@ -21,7 +22,7 @@ export default function Register() {
     setLoading(true);
     try {
       await register(name, email, password, language);
-      nav('/');
+      nav('/home');
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -36,8 +37,11 @@ export default function Register() {
           <div style={{ width: 56, height: 56, borderRadius: 16, background: 'linear-gradient(135deg, #1A3C5E, #17A589)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', fontSize: 28 }}>
             🌿
           </div>
-          <h1 style={{ fontSize: 24, fontWeight: 700, color: 'var(--primary-dark)', marginBottom: 4 }}>Create your account</h1>
+          <h1 style={{ fontSize: 24, fontWeight: 700, color: 'var(--primary-dark)', marginBottom: 4 }}>Create your free account</h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Anonymous & confidential — we only need a nickname</p>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginTop: 12, padding: '6px 14px', borderRadius: 999, background: 'var(--accent-light)', color: 'var(--accent)', fontWeight: 600, fontSize: 13 }}>
+            ✨ 100% free — full portal access, no card
+          </div>
         </div>
 
         <form onSubmit={handleSubmit}>
@@ -65,6 +69,8 @@ export default function Register() {
             {loading ? <span className="spinner" /> : 'Get started — it\'s free'}
           </button>
         </form>
+
+        <SocialAuth onSuccess={() => nav('/home')} />
 
         <p style={{ textAlign: 'center', marginTop: 20, color: 'var(--text-secondary)', fontSize: 14 }}>
           Already have an account?{' '}
