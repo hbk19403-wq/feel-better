@@ -24,13 +24,25 @@ export default function InCallScreen() {
   const [settleOrder, setSettleOrder] = useState<any | null>(null);
   const [settleUtr, setSettleUtr] = useState('');
   const [settleBusy, setSettleBusy] = useState(false);
-  const { data: session } = useGetSessionQuery(id!);
+  // Poll so we see when (if) a real listener claims the session.
+  const { data: session } = useGetSessionQuery(id!, { pollingInterval: 4000 });
+  const connected = session?.status === 'active';
+  // After ~12s with no listener, offer the AI companion instead of a fake call.
+  const [waitedLong, setWaitedLong] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval>>();
 
+  // The session timer (and ₹1/min billing) only runs once a listener is connected.
   useEffect(() => {
+    if (!connected) return;
     intervalRef.current = setInterval(() => setElapsed((e) => e + 1), 1000);
     return () => clearInterval(intervalRef.current);
-  }, []);
+  }, [connected]);
+
+  useEffect(() => {
+    if (connected) { setWaitedLong(false); return; }
+    const t = setTimeout(() => setWaitedLong(true), 12000);
+    return () => clearTimeout(t);
+  }, [connected]);
 
   useEffect(() => {
     if (elapsed === 25 * 60) {
@@ -144,13 +156,37 @@ export default function InCallScreen() {
           <Text style={{ color: '#FFF', fontSize: 24, fontWeight: '700' }}>
             {session?.listener_alias ?? 'Your Listener'}
           </Text>
-          <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 15, marginTop: 6 }}>
-            Here to listen — confidentially
-          </Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 6 }}>
-            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.accentTeal }} />
-            <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 13 }}>End-to-end encrypted</Text>
-          </View>
+
+          {connected && (
+            <>
+              <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 15, marginTop: 6 }}>
+                Here to listen — confidentially
+              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 6 }}>
+                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.accentTeal }} />
+                <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 13 }}>End-to-end encrypted</Text>
+              </View>
+            </>
+          )}
+
+          {!connected && !waitedLong && (
+            <Text style={{ color: 'rgba(255,255,255,0.75)', fontSize: 14, marginTop: 8, textAlign: 'center', paddingHorizontal: 20 }}>
+              Connecting you to a listener… billing starts at ₹1/min only once they join.
+            </Text>
+          )}
+
+          {!connected && waitedLong && (
+            <View style={{ marginTop: 14, backgroundColor: 'rgba(255,255,255,0.14)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.22)', borderRadius: 16, padding: 18, alignItems: 'center' }}>
+              <Text style={{ color: '#FFF', fontSize: 15, fontWeight: '700', marginBottom: 6 }}>No listeners are online right now 💛</Text>
+              <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 13.5, textAlign: 'center', lineHeight: 20, marginBottom: 14 }}>
+                Our human listeners aren't available this moment — and you haven't been charged. Our AI companion is here 24/7, right now.
+              </Text>
+              <TouchableOpacity onPress={() => router.replace('/(app)/ai')}
+                style={{ backgroundColor: '#fff', borderRadius: 22, paddingVertical: 12, paddingHorizontal: 22 }}>
+                <Text style={{ color: Colors.primaryMid, fontWeight: '800' }}>💬 Chat with our AI companion</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
 
         {/* Controls */}

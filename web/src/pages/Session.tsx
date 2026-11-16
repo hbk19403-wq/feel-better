@@ -34,6 +34,9 @@ export default function Session() {
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const [storageDown, setStorageDown] = useState(false);
+  // True once we've waited a while with no listener claiming the session, so we
+  // can offer the caller the AI companion instead of spinning forever.
+  const [waitedLong, setWaitedLong] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
@@ -52,6 +55,14 @@ export default function Session() {
     const t = setInterval(loadSession, 4000);
     return () => clearInterval(t);
   }, [loadSession]);
+
+  // If no listener claims the session within ~12s, stop implying one is about to
+  // join and offer the AI companion instead of an endless "Connecting…".
+  useEffect(() => {
+    if (session?.status === 'active') { setWaitedLong(false); return; }
+    const t = setTimeout(() => setWaitedLong(true), 12000);
+    return () => clearTimeout(t);
+  }, [session?.status]);
 
   const loadMessages = useCallback(async () => {
     try {
@@ -187,10 +198,22 @@ export default function Session() {
         <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>{session?.listener_name || 'Your Listener'}</h2>
         <p style={{ opacity: 0.75, fontSize: 14, marginBottom: session && session.status !== 'active' ? 16 : 28 }}>Speaking with you anonymously as <strong>{session?.user_alias || '…'}</strong></p>
 
-        {session && session.status !== 'active' && (
+        {session && session.status !== 'active' && !waitedLong && (
           <div style={{ background: 'rgba(255,255,255,0.14)', border: '1px solid rgba(255,255,255,0.22)', borderRadius: 14, padding: '14px 18px', marginBottom: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
             <span className="spinner" style={{ borderTopColor: 'white' }} />
             <span style={{ fontSize: 14, opacity: 0.9 }}>Connecting you to a listener… billing starts at ₹1/min only once they join. You can start typing anytime.</span>
+          </div>
+        )}
+
+        {session && session.status !== 'active' && waitedLong && (
+          <div style={{ background: 'rgba(255,255,255,0.14)', border: '1px solid rgba(255,255,255,0.22)', borderRadius: 14, padding: '16px 18px', marginBottom: 28, textAlign: 'center' }}>
+            <p style={{ fontSize: 15, fontWeight: 600, marginBottom: 6 }}>No listeners are online right now 💛</p>
+            <p style={{ fontSize: 13.5, opacity: 0.85, marginBottom: 14, lineHeight: 1.5 }}>
+              Our human listeners aren't available this moment — and you haven't been charged. You don't have to wait alone: our AI companion is here 24/7, right now.
+            </p>
+            <button className="btn btn-primary" style={{ background: 'white', color: '#1A3C5E', fontWeight: 700 }} onClick={() => nav('/ai-listeners')}>
+              💬 Chat with our AI companion now
+            </button>
           </div>
         )}
 
