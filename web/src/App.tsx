@@ -24,6 +24,8 @@ import ListenerSession from './pages/ListenerSession';
 import Community from './pages/Community';
 import VentLine from './pages/VentLine';
 import Plans from './pages/Plans';
+import Privacy from './pages/Privacy';
+import Terms from './pages/Terms';
 
 function RequireAuth({ children }: { children: React.ReactElement }) {
   const { user, loading } = useAuth();
@@ -44,6 +46,8 @@ function AppRoutes() {
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/" element={<Landing />} />
       <Route path="/chat" element={<PublicChat />} />
+      <Route path="/privacy" element={<Privacy />} />
+      <Route path="/terms" element={<Terms />} />
       <Route path="/home" element={<RequireAuth><Layout><Home /></Layout></RequireAuth>} />
       <Route path="/match" element={<RequireAuth><Layout><Match /></Layout></RequireAuth>} />
       <Route path="/session/:id" element={<RequireAuth><Layout><Session /></Layout></RequireAuth>} />
